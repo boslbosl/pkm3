@@ -160,13 +160,21 @@ def detect(
     v = _open()
     found = v.detect(os_scope)
     v.close()
-    if not found:
-        typer.echo(f"No sync-able agents detected (scope: {os_scope}).")
-    for tool, info in sorted(found.items()):
-        typer.echo(
-            f"{tool:<12} ~{info['sessions']} sessions  "
-            f"[{', '.join(info['os_contexts'])}]  {info['paths'][0]}"
-        )
+    # list every auto-discoverable agent, marking the ones not present
+    for tool in sorted(syncable_sources()):
+        info = found.get(tool)
+        if info:
+            typer.secho(
+                f"{tool:<12} found     ~{info['sessions']} sessions  "
+                f"[{', '.join(info['os_contexts'])}]  {info['paths'][0]}",
+                fg=typer.colors.GREEN,
+            )
+        else:
+            typer.secho(f"{tool:<12} not found", fg=typer.colors.BRIGHT_BLACK)
+    typer.echo(
+        f"\n{len(found)} found, {len(syncable_sources()) - len(found)} not found "
+        f"(scope: {os_scope})."
+    )
     if save:
         cfg = VaultConfig.load(_vault_path())
         cfg.sync_sources = sorted(found.keys())
