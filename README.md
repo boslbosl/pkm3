@@ -15,22 +15,33 @@ v0.4 spec, and `task.md` for implementation status.
 **v0.4** adds an Antigravity (IDE + CLI) adapter, cross-OS collection between WSL and
 Windows, and a local web UI for browsing/searching the vault.
 
-## Install (dev)
+## Setup (uv)
+
+This project is managed with [uv](https://docs.astral.sh/uv/). Dependencies are
+installed into a project-local `.venv` from the committed `uv.lock` — nothing is
+installed into your global/system Python.
 
 ```bash
-pip install -e ".[dev]"
+uv sync          # create .venv and install deps (incl. the dev group)
+```
+
+Run any command inside the environment with `uv run` (no manual activation needed):
+
+```bash
+uv run aivault --help
 ```
 
 ## Quick start (vertical slice)
 
 ```bash
-aivault init ~/ai-vault
-aivault import-file ./tests/fixtures/claude-code-session.jsonl --source claude-code
-aivault list
-aivault search "refresh token"
-aivault show <session-id>
-aivault mark <session-id> wiki-ready
-aivault export llmwiki --status wiki-ready --out ./out/llmwiki
+uv run aivault init ~/ai-vault
+uv run aivault import-file ./tests/fixtures/claude-code-session.jsonl --source claude-code
+uv run aivault list
+uv run aivault search "refresh token"
+uv run aivault show <session-id>
+uv run aivault mark <session-id> wiki-ready
+uv run aivault export llmwiki --status wiki-ready --out ./out/llmwiki
+uv run aivault serve            # browse the vault at http://127.0.0.1:8765
 ```
 
 The active vault is chosen by `--vault PATH`, then `$AIVAULT_HOME`, then `~/ai-vault`.
@@ -70,7 +81,7 @@ session records its `os_context` so the two sides never silently merge.
 ## Tests
 
 ```bash
-pytest
+uv run pytest
 ```
 
 ## Stack
