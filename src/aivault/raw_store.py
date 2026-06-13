@@ -21,6 +21,7 @@ _KNOWN_BUCKETS = {
     "claude",
     "cursor",
     "cline",
+    "specstory",
     "folder",
     "cass",
 }

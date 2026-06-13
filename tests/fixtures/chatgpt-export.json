@@ -1,0 +1,28 @@
+[
+  {
+    "title": "Summarize abstract",
+    "conversation_id": "cg-1",
+    "create_time": 1700000000,
+    "update_time": 1700000100,
+    "mapping": {
+      "root": {"id": "root", "message": null, "parent": null, "children": ["a"]},
+      "a": {"id": "a", "parent": "root", "children": ["b"],
+            "message": {"author": {"role": "user"}, "create_time": 1700000001,
+                        "content": {"content_type": "text", "parts": ["Summarize this abstract for me"]}}},
+      "b": {"id": "b", "parent": "a", "children": [],
+            "message": {"author": {"role": "assistant"}, "create_time": 1700000002,
+                        "content": {"content_type": "text", "parts": ["Here is a concise summary of the abstract."]}}}
+    }
+  },
+  {
+    "title": "Empty system-only conversation",
+    "conversation_id": "cg-2",
+    "create_time": 1700001000,
+    "mapping": {
+      "root": {"id": "root", "message": null, "parent": null, "children": ["s"]},
+      "s": {"id": "s", "parent": "root", "children": [],
+            "message": {"author": {"role": "system"}, "create_time": 1700001001,
+                        "content": {"content_type": "text", "parts": [""]}}}
+    }
+  }
+]

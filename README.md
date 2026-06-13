@@ -64,6 +64,39 @@ The active vault is chosen by `--vault PATH`, then `$AIVAULT_HOME`, then `~/ai-v
 | `aivault export llmwiki --status wiki-ready --out <path>` | Export Markdown + manifest |
 | `aivault serve [--host] [--port]` | Local web UI to browse/search the vault |
 
+## Supported sources
+
+Every tool below has a format-aware adapter. Import any single file with
+`import-file --source <tool>` (or a directory with `import-folder`):
+
+| `--source` | Tool | Input |
+|---|---|---|
+| `claude-code` | Claude Code | session `*.jsonl` |
+| `codex` | Codex CLI/Desktop | rollout `*.jsonl` |
+| `antigravity` | Antigravity (IDE + CLI) | agent `*.jsonl` |
+| `cursor` | Cursor | exported conversation JSON/JSONL |
+| `cline` | Cline | `api_conversation_history.json` |
+| `specstory` | SpecStory | `.specstory/history/*.md` |
+| `chatgpt` | ChatGPT | official export `.zip` or `conversations.json` |
+| `claude` | Claude (web/desktop) | official export `.zip` or `conversations.json` |
+| `folder` | anything else | `.md` / `.txt` / `.json` / `.html` (best-effort) |
+
+```bash
+uv run aivault import-file ./tests/fixtures/claude-code-session.jsonl --source claude-code
+uv run aivault import-file ./tests/fixtures/codex-session.jsonl        --source codex
+uv run aivault import-file ./tests/fixtures/antigravity-session.jsonl  --source antigravity
+uv run aivault import-file ./tests/fixtures/cursor-session.json        --source cursor
+uv run aivault import-file ./tests/fixtures/cline-task.json            --source cline
+uv run aivault import-file ./tests/fixtures/specstory-history.md       --source specstory
+uv run aivault import-file ./tests/fixtures/chatgpt-export.json        --source chatgpt
+uv run aivault import-file ./tests/fixtures/claude-export.json         --source claude
+```
+
+`sync` auto-discovers local logs for tools with a known on-disk location
+(`claude-code`, `codex`, `antigravity`, `cline`); the rest are imported from
+their export files. Export-based adapters are best-effort and version-tolerant
+(ARCHITECTURE §18.1).
+
 ## Web UI
 
 `aivault serve` starts a dependency-free, local-only web app (default

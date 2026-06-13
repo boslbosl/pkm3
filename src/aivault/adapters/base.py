@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 
-from ..models import CanonicalSession, SourceCandidate
+from ..models import CanonicalMessage, CanonicalSession, SourceCandidate
 from ..platform_paths import home_dirs
 
 # crude path-ish token used as a fallback to surface files mentioned in prose
@@ -129,6 +130,28 @@ def candidates_from_homes(
     return out
 
 
+def to_iso(ts) -> str | None:
+    """Normalize a timestamp (epoch seconds or ISO string) to an ISO string."""
+    if ts is None:
+        return None
+    if isinstance(ts, (int, float)):
+        try:
+            return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(timespec="seconds")
+        except (OSError, ValueError, OverflowError):
+            return None
+    if isinstance(ts, str) and ts.strip():
+        return ts
+    return None
+
+
+def first_user_title(messages: list[CanonicalMessage]) -> str | None:
+    """First non-empty user message's first line, trimmed — a default title."""
+    for m in messages:
+        if m.role == "user" and m.content.strip():
+            return m.content.strip().splitlines()[0][:80]
+    return None
+
+
 def dedupe_keep_order(items: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -146,14 +169,24 @@ def dedupe_keep_order(items: list[str]) -> list[str]:
 def _build_registry() -> dict[str, SourceAdapter]:
     # imported here to avoid circular imports at module load
     from .antigravity import AntigravityAdapter
+    from .chatgpt import ChatGPTAdapter
     from .claude_code import ClaudeCodeAdapter
+    from .claude_export import ClaudeExportAdapter
+    from .cline import ClineAdapter
     from .codex import CodexAdapter
+    from .cursor import CursorAdapter
     from .folder_import import FolderImportAdapter
+    from .specstory import SpecStoryAdapter
 
     adapters: list[SourceAdapter] = [
         ClaudeCodeAdapter(),
         CodexAdapter(),
         AntigravityAdapter(),
+        CursorAdapter(),
+        ClineAdapter(),
+        SpecStoryAdapter(),
+        ChatGPTAdapter(),
+        ClaudeExportAdapter(),
         FolderImportAdapter(),
     ]
     return {a.source_type: a for a in adapters}

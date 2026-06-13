@@ -192,26 +192,26 @@ Acceptance criteria:
 
 ## 7. Source support strategy
 
-### MVP native adapters
+### Implemented adapters (v0.4)
 
-1. Claude Code JSONL
-2. Codex JSONL
-3. Folder import for Markdown/JSON/HTML/TXT exports
+All of the following ship with format-aware, version-tolerant adapters and tests:
 
-### Near-term adapters
+1. Claude Code JSONL — *native, sync-discoverable*
+2. Codex JSONL — *native, sync-discoverable*
+3. Antigravity (IDE + CLI) local logs — *native, sync-discoverable*
+4. Cline task history (`api_conversation_history.json`) — *native, sync-discoverable*
+5. Cursor exported conversation (JSON/JSONL) — *import-file/import-folder*
+6. SpecStory Markdown history — *import-file/import-folder*
+7. ChatGPT official export (`.zip` or `conversations.json`) — *import-file*
+8. Claude official export (`.zip` or `conversations.json`) — *import-file*
+9. Folder import for Markdown/JSON/HTML/TXT exports — *generic fallback*
 
-4. Antigravity (IDE + CLI) local logs
-5. ChatGPT official export ZIP
-6. Claude official export
-7. SpecStory Markdown history
-8. Cline task history
-9. Cursor local/export adapter
-
-All native adapters support cross-OS discovery (WSL ↔ Windows) via `--os-scope`.
+Tools with a known on-disk location are also reachable via `aivault sync <tool>`
+with cross-OS discovery (WSL ↔ Windows) via `--os-scope`.
 
 ### Optional bridge
 
-9. CASS bridge for coding-agent discovery, search, and import assistance
+10. CASS bridge for coding-agent discovery, search, and import assistance
 
 ### Later adapters
 
