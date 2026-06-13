@@ -26,6 +26,7 @@ VAULT_DIRS = (
     "raw/artifacts/claude",
     "raw/artifacts/cursor",
     "raw/artifacts/cline",
+    "raw/artifacts/specstory",
     "raw/artifacts/folder",
     "raw/artifacts/cass",
     "raw/manifests",

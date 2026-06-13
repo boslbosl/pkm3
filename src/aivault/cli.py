@@ -132,7 +132,7 @@ def import_folder(
     for f in sorted(path.glob(pattern)):
         if not f.is_file():
             continue
-        if f.suffix.lower() not in (".md", ".txt", ".json", ".jsonl", ".html", ".htm"):
+        if f.suffix.lower() not in (".md", ".txt", ".json", ".jsonl", ".html", ".htm", ".zip"):
             continue
         res = v.import_file(f, source)
         imported += len(res.imported)
@@ -175,6 +175,12 @@ def sync_codex(os_scope: str = _OS_SCOPE_OPT):
 def sync_antigravity(os_scope: str = _OS_SCOPE_OPT):
     """Discover and import Antigravity (IDE + CLI) logs."""
     _sync("antigravity", os_scope)
+
+
+@sync_app.command("cline")
+def sync_cline(os_scope: str = _OS_SCOPE_OPT):
+    """Discover and import Cline task history (VS Code globalStorage)."""
+    _sync("cline", os_scope)
 
 
 # ---------------------------------------------------------------------------

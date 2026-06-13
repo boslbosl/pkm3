@@ -1,0 +1,7 @@
+{
+  "title": "Fix flaky login test",
+  "messages": [
+    {"role": "user", "content": "Why is test_login flaky on CI?"},
+    {"role": "assistant", "content": "It depends on the system clock. Freeze time with freezegun in tests/test_login.py."}
+  ]
+}

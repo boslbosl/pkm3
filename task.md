@@ -37,7 +37,7 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` todo
 - [x] `adapters/folder_import.py` — md/txt/json/html fallback
 - [x] `aivault import-file` / `import-folder`
 - [x] `aivault discover` / `sync claude-code` / `sync codex`
-- [ ] Cline / Cursor / SpecStory adapters (post-MVP)
+- [x] Cline / Cursor / SpecStory adapters (+ fixtures + tests)
 
 ## Phase 3 — Search and session view
 - [x] FTS5 indexing of title/prompts/responses/commands/file_paths/summary/notes
@@ -59,8 +59,11 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` todo
 - [x] `aivault export llmwiki --status wiki-ready --out <path>`
 - [ ] `exporters/obsidian.py`, `exporters/jsonl.py` (post-MVP)
 
-## Phase 6 — Web/export sources (post-MVP)
-- [ ] ChatGPT export zip, Claude export, Pactify/Notion folders, Perplexity
+## Phase 6 — Web/export sources
+- [x] ChatGPT official export (`.zip` / `conversations.json`)
+- [x] Claude official export (`.zip` / `conversations.json`)
+- [x] `.zip` accepted by `import-file` / `import-folder`
+- [ ] Pactify/Notion folders, Perplexity (use generic folder import for now)
 
 ## Phase 7 — Optional CASS bridge (post-MVP)
 - [ ] `adapters/cass_bridge.py` (subprocess; raw-store backfill only)
@@ -71,6 +74,7 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` todo
 - [x] `test_codex_adapter.py`
 - [x] `test_dedupe.py`
 - [x] `test_llmwiki_export.py` (incl. idempotency)
+- [x] `test_more_adapters.py` — cursor / cline / specstory / chatgpt / claude (+ zip)
 - [x] `conftest.py` — temp vault fixture
 
 ## Phase 8 — v0.4 additions (Antigravity, cross-OS, web UI)

@@ -1,0 +1,12 @@
+[
+  {
+    "uuid": "cl-1",
+    "name": "Plan a trip to Rome",
+    "created_at": "2026-05-01T10:00:00Z",
+    "updated_at": "2026-05-01T10:05:00Z",
+    "chat_messages": [
+      {"sender": "human", "text": "Plan 3 days in Rome", "created_at": "2026-05-01T10:00:00Z"},
+      {"sender": "assistant", "text": "Day 1: Colosseum and Roman Forum.", "created_at": "2026-05-01T10:00:05Z"}
+    ]
+  }
+]
