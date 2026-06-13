@@ -456,9 +456,10 @@ MVP CLI:
 aivault init [path]
 aivault status
 aivault discover [--os-scope native|windows|wsl|all]
-aivault sync claude-code [--os-scope ...]
-aivault sync codex [--os-scope ...]
-aivault sync antigravity [--os-scope ...]
+aivault detect [--os-scope ...] [--save]      # which agents are sync-able here
+aivault config show
+aivault config set-sources <agent...>          # pick agents for `sync`
+aivault sync [<agent>] [--os-scope ...] [--all] # no arg -> sync configured agents
 aivault import-file <path> --source <source>
 aivault import-folder <path> --source <source>
 aivault list [--source] [--project] [--status]

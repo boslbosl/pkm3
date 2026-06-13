@@ -8,6 +8,7 @@ from typing import Optional
 import typer
 
 from . import __version__
+from .adapters.base import syncable_sources
 from .config import VaultConfig, resolve_vault_path
 from .exporters.llmwiki import export_llmwiki
 from .service import Vault, init_vault, normalize_status
@@ -17,10 +18,10 @@ app = typer.Typer(
     no_args_is_help=True,
     help="AIVault — local-first AI session collector, search, triage, and LLM Wiki export.",
 )
-sync_app = typer.Typer(no_args_is_help=True, help="Discover + import native logs.")
 export_app = typer.Typer(no_args_is_help=True, help="Export curated sessions.")
-app.add_typer(sync_app, name="sync")
+config_app = typer.Typer(no_args_is_help=True, help="View and edit vault config.")
 app.add_typer(export_app, name="export")
+app.add_typer(config_app, name="config")
 
 # global state populated by the root callback
 _state: dict[str, Optional[Path]] = {"vault": None}
@@ -145,42 +146,81 @@ def import_folder(
     v.close()
 
 
-def _sync(source_tool: str, os_scope: str):
+_OS_SCOPE_OPT = typer.Option(None, "--os-scope", help="native | windows | wsl | all.")
+
+
+@app.command()
+def detect(
+    os_scope: str = typer.Option("native", "--os-scope", help="native | windows | wsl | all."),
+    save: bool = typer.Option(
+        False, "--save", help="Save detected agents to config as the sync set."
+    ),
+):
+    """Detect which agents are sync-able on this machine (and optionally save them)."""
     v = _open()
-    res = v.sync(source_tool, os_scope)
+    found = v.detect(os_scope)
+    v.close()
+    if not found:
+        typer.echo(f"No sync-able agents detected (scope: {os_scope}).")
+    for tool, info in sorted(found.items()):
+        typer.echo(
+            f"{tool:<12} ~{info['sessions']} sessions  "
+            f"[{', '.join(info['os_contexts'])}]  {info['paths'][0]}"
+        )
+    if save:
+        cfg = VaultConfig.load(_vault_path())
+        cfg.sync_sources = sorted(found.keys())
+        cfg.sync_os_scope = os_scope
+        cfg.save()
+        typer.secho(
+            f"Saved sync sources: {', '.join(cfg.sync_sources) or '(none)'}",
+            fg=typer.colors.GREEN,
+        )
+
+
+@app.command()
+def sync(
+    tool: Optional[str] = typer.Argument(
+        None, help="Agent to sync (e.g. claude-code). Omit to sync configured agents."
+    ),
+    os_scope: Optional[str] = _OS_SCOPE_OPT,
+    all_: bool = typer.Option(False, "--all", help="Sync every sync-able agent."),
+):
+    """Discover and import native logs. With no argument, syncs the agents in config."""
+    cfg = VaultConfig.load(_vault_path())
+    scope = os_scope or cfg.sync_os_scope
+
+    if tool:
+        targets = [tool]
+    elif all_:
+        targets = syncable_sources()
+    else:
+        targets = cfg.sync_sources
+        if not targets:
+            typer.secho(
+                "No sync sources configured. Run `aivault detect --save` (or "
+                "`aivault config set-sources <agent...>`), or pass an agent / --all.",
+                fg=typer.colors.YELLOW,
+            )
+            raise typer.Exit(1)
+
+    v = Vault(cfg)
+    total_i = total_s = total_f = 0
+    for t in targets:
+        res = v.sync(t, scope)
+        total_i += len(res.imported)
+        total_s += res.skipped
+        total_f += res.findings
+        typer.echo(
+            f"  {t:<12} {len(res.imported)} imported, {res.skipped} skipped, "
+            f"{res.findings} findings"
+        )
+    v.close()
     typer.secho(
-        f"{source_tool} (scope: {os_scope}): {len(res.imported)} imported, "
-        f"{res.skipped} skipped, {res.findings} findings.",
+        f"Sync ({', '.join(targets)} @ {scope}): {total_i} imported, "
+        f"{total_s} skipped, {total_f} findings.",
         fg=typer.colors.GREEN,
     )
-    v.close()
-
-
-_OS_SCOPE_OPT = typer.Option("native", "--os-scope", help="native | windows | wsl | all.")
-
-
-@sync_app.command("claude-code")
-def sync_claude_code(os_scope: str = _OS_SCOPE_OPT):
-    """Discover and import Claude Code JSONL logs."""
-    _sync("claude-code", os_scope)
-
-
-@sync_app.command("codex")
-def sync_codex(os_scope: str = _OS_SCOPE_OPT):
-    """Discover and import Codex JSONL logs."""
-    _sync("codex", os_scope)
-
-
-@sync_app.command("antigravity")
-def sync_antigravity(os_scope: str = _OS_SCOPE_OPT):
-    """Discover and import Antigravity (IDE + CLI) logs."""
-    _sync("antigravity", os_scope)
-
-
-@sync_app.command("cline")
-def sync_cline(os_scope: str = _OS_SCOPE_OPT):
-    """Discover and import Cline task history (VS Code globalStorage)."""
-    _sync("cline", os_scope)
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +400,44 @@ def serve(
         typer.secho(f"No vault at {root}. Run `aivault init {root}`.", fg=typer.colors.RED)
         raise typer.Exit(1)
     run_web(root, host=host, port=port)
+
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+@config_app.command("show")
+def config_show():
+    """Print the current vault configuration."""
+    cfg = VaultConfig.load(_vault_path())
+    typer.echo(f"root:                {cfg.root}")
+    typer.echo(f"version:             {cfg.version}")
+    typer.echo(f"default_sensitivity: {cfg.default_sensitivity}")
+    typer.echo(f"redaction_policy:    {cfg.redaction_policy}")
+    typer.echo(f"sync_os_scope:       {cfg.sync_os_scope}")
+    typer.echo(f"sync_sources:        {', '.join(cfg.sync_sources) or '(none)'}")
+
+
+@config_app.command("set-sources")
+def config_set_sources(
+    sources: list[str] = typer.Argument(..., help="Agents that `sync` will sync."),
+    os_scope: Optional[str] = typer.Option(None, "--os-scope", help="Also set the sync scope."),
+):
+    """Set which agents `aivault sync` (no argument) syncs."""
+    cfg = VaultConfig.load(_vault_path())
+    syncable = set(syncable_sources())
+    unknown = [s for s in sources if s not in syncable]
+    if unknown:
+        typer.secho(
+            f"Warning: not auto-discoverable, will be no-ops on sync: {', '.join(unknown)}. "
+            f"Sync-able agents: {', '.join(sorted(syncable))}.",
+            fg=typer.colors.YELLOW,
+        )
+    cfg.sync_sources = list(dict.fromkeys(sources))  # de-dupe, keep order
+    if os_scope:
+        cfg.sync_os_scope = os_scope
+    cfg.save()
+    typer.secho(f"sync_sources = {', '.join(cfg.sync_sources)}", fg=typer.colors.GREEN)
 
 
 def main() -> None:
