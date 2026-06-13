@@ -1,0 +1,8 @@
+{"type":"summary","summary":"Add JWT refresh token rotation to auth.py","leafUuid":"u4"}
+{"type":"user","sessionId":"cc-sess-001","cwd":"/home/dev/myrepo","timestamp":"2026-06-10T09:00:00Z","uuid":"u1","message":{"role":"user","content":"Help me implement JWT refresh token rotation in auth.py"}}
+{"type":"assistant","sessionId":"cc-sess-001","timestamp":"2026-06-10T09:00:05Z","uuid":"u2","message":{"role":"assistant","content":[{"type":"text","text":"I'll update auth.py to rotate refresh tokens, then run the tests."},{"type":"tool_use","name":"Bash","input":{"command":"pytest tests/test_auth.py -q"}}]}}
+{"type":"user","sessionId":"cc-sess-001","timestamp":"2026-06-10T09:01:00Z","uuid":"u3","message":{"role":"user","content":[{"type":"tool_result","content":"2 passed in 0.4s"}]}}
+{"type":"assistant","sessionId":"cc-sess-001","timestamp":"2026-06-10T09:01:10Z","uuid":"u4","message":{"role":"assistant","content":[{"type":"text","text":"Done."},{"type":"tool_use","name":"Edit","input":{"file_path":"/home/dev/myrepo/auth.py","old_string":"x","new_string":"y"}}]}}
+this line is intentionally malformed and must be skipped
+{"type":"user","sessionId":"cc-sess-002","cwd":"/home/dev/other","timestamp":"2026-06-10T11:00:00Z","uuid":"v1","message":{"role":"user","content":"Quick question about logging config"}}
+{"type":"assistant","sessionId":"cc-sess-002","timestamp":"2026-06-10T11:00:03Z","uuid":"v2","message":{"role":"assistant","content":[{"type":"text","text":"Set LOG_LEVEL=DEBUG in your .env file."}]}}

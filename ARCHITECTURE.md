@@ -446,3 +446,30 @@ Later:
 3. Whether to generate session capsules via local LLM, hosted LLM, or no LLM in MVP.
 4. How much Cursor and Cline support to ship in MVP versus using CASS/folder import first.
 5. Whether vault should live globally or per-project by default.
+
+---
+
+## 18. Resolved MVP decisions
+
+These resolve §17 for the first implementation so coding can begin. They are MVP
+choices, not permanent constraints.
+
+| # | Decision | Resolution for MVP | Rationale |
+|---|---|---|---|
+| 1 | Language | **Python 3.11+ only** | Best filesystem/parsing ergonomics; simple CASS subprocess bridge later. TS/Tauri UI deferred to post-MVP. |
+| 2 | Message storage | **SQLite only** (raw file stays immutable in `raw/`) | Single source of truth; normalized JSONL export can be added as an exporter, not a second store. |
+| 3 | Capsule generation | **No LLM in MVP** | Export raw excerpts + extracted commands/files. Capsule (`Goal`, `Key outcome`, …) sections are emitted with best-effort heuristics and left for later LLM enrichment. |
+| 4 | Cursor / Cline | **Deferred** | MVP ships Claude Code + Codex native adapters and a generic folder importer as the fallback for everything else. |
+| 5 | Vault location | **Global by default** (`~/ai-vault`), overridable via `--vault` or `AIVAULT_HOME` | Sessions span many projects; a single vault avoids fragmentation. |
+
+### 18.1 Adapter robustness requirement
+
+Coding-agent JSONL formats drift between tool versions (field renames, content as
+`str` vs. list-of-blocks, summary/meta lines, tool-call wrappers). All native
+adapters MUST:
+
+- parse **line-by-line and tolerate malformed/unknown lines** (skip, never crash);
+- normalize `content` whether it is a plain string or a list of typed blocks
+  (`text`, `input_text`, `output_text`, `tool_use`, `tool_result`);
+- treat session id / cwd / timestamps as **optional** and fall back gracefully;
+- be covered by a fixture in `tests/fixtures/` representing the expected shape.
