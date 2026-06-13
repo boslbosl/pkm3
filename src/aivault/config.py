@@ -7,7 +7,7 @@ Vault is global by default (`~/ai-vault`), overridable via `--vault` or
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -57,6 +57,11 @@ class VaultConfig:
     version: str = __version__
     default_sensitivity: str = "unknown"
     redaction_policy: str = "warn"  # warn | block | mask | off
+    # agents that `aivault sync` (no argument) will sync. Populated by
+    # `aivault detect --save` or `aivault config set-sources`.
+    sync_sources: list[str] = field(default_factory=list)
+    # default OS scope used by `sync` / `detect` when not overridden
+    sync_os_scope: str = "native"
 
     @property
     def db_path(self) -> Path:
@@ -80,6 +85,8 @@ class VaultConfig:
             "root": str(self.root),
             "default_sensitivity": self.default_sensitivity,
             "redaction_policy": self.redaction_policy,
+            "sync_sources": self.sync_sources,
+            "sync_os_scope": self.sync_os_scope,
         }
         self.config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
@@ -96,6 +103,8 @@ class VaultConfig:
             version=data.get("version", __version__),
             default_sensitivity=data.get("default_sensitivity", "unknown"),
             redaction_policy=data.get("redaction_policy", "warn"),
+            sync_sources=list(data.get("sync_sources") or []),
+            sync_os_scope=data.get("sync_os_scope", "native"),
         )
 
 

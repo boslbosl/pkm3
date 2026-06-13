@@ -195,6 +195,16 @@ def _build_registry() -> dict[str, SourceAdapter]:
 registry: dict[str, SourceAdapter] = {}
 
 
+def syncable_sources() -> list[str]:
+    """Source tools that support auto-discovery (i.e. `aivault sync <tool>`),
+    namely adapters that declare home-relative locations to scan."""
+    out = []
+    for tool, adapter in _build_registry().items():
+        if getattr(adapter, "home_subpaths", ()):
+            out.append(tool)
+    return out
+
+
 def get_adapter(source_tool: str) -> SourceAdapter:
     global registry
     if not registry:

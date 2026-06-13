@@ -231,6 +231,22 @@ class Vault:
             candidates.extend(adapter.discover(os_scope))
         return candidates
 
+    def detect(self, os_scope: str = "native") -> dict[str, dict]:
+        """Group discovered candidates by source tool: which agents are sync-able
+        on this machine right now, with file counts and locations."""
+        found: dict[str, dict] = {}
+        for c in self.discover(os_scope):
+            entry = found.setdefault(
+                c.source_tool, {"sessions": 0, "paths": [], "os_contexts": set()}
+            )
+            entry["sessions"] += c.estimated_sessions
+            entry["paths"].append(str(c.path))
+            entry["os_contexts"].add(c.os_context)
+        # make JSON/printing friendly
+        for entry in found.values():
+            entry["os_contexts"] = sorted(entry["os_contexts"])
+        return found
+
     def sync(self, source_tool: str, os_scope: str = "native") -> ImportResult:
         adapter = get_adapter(source_tool)
         total = ImportResult()

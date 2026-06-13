@@ -52,8 +52,10 @@ The active vault is chosen by `--vault PATH`, then `$AIVAULT_HOME`, then `~/ai-v
 |---|---|
 | `aivault init [path]` | Create a local vault (dirs + SQLite + config) |
 | `aivault status` | Show vault location and counts |
-| `aivault discover [--os-scope native\|windows\|wsl\|all]` | List local sources (optionally cross-OS) |
-| `aivault sync claude-code` / `sync codex` / `sync antigravity` | Discover + import native logs (`--os-scope`) |
+| `aivault detect [--os-scope ...] [--save]` | Detect which agents are sync-able here (and optionally save them to config) |
+| `aivault sync [<agent>] [--all]` | Discover + import logs; no argument syncs the agents in config |
+| `aivault config show` / `config set-sources <agent...>` | View / set which agents `sync` uses |
+| `aivault discover [--os-scope native\|windows\|wsl\|all]` | List raw local source candidates |
 | `aivault import-file <path> --source <s>` | Import a single file |
 | `aivault import-folder <path> --source <s>` | Import a folder of exports |
 | `aivault list [--source] [--project] [--status]` | List sessions |
@@ -96,6 +98,22 @@ uv run aivault import-file ./tests/fixtures/claude-export.json         --source 
 (`claude-code`, `codex`, `antigravity`, `cline`); the rest are imported from
 their export files. Export-based adapters are best-effort and version-tolerant
 (ARCHITECTURE §18.1).
+
+### Configuring sync
+
+Pick your agents once, then just run `sync`:
+
+```bash
+uv run aivault detect --os-scope all      # see which agents are present
+uv run aivault detect --os-scope all --save   # save them as the sync set
+# or set them explicitly:
+uv run aivault config set-sources claude-code codex cline
+uv run aivault config show
+
+uv run aivault sync          # syncs the configured agents
+uv run aivault sync --all    # syncs every auto-discoverable agent
+uv run aivault sync codex    # syncs just one
+```
 
 ## Web UI
 

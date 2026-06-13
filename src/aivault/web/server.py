@@ -24,6 +24,24 @@ _CONTENT_TYPES = {
 }
 
 
+def resolve_static(url_path: str) -> Path | None:
+    """Map a request path to a file under STATIC_DIR, or None if invalid.
+
+    Handles ``/``, ``/index.html``, ``/app.js`` and ``/static/app.js`` (the
+    prefix used in index.html) without doubling the ``static/`` segment, and
+    rejects path traversal.
+    """
+    rel = url_path.lstrip("/")
+    if rel.startswith("static/"):
+        rel = rel[len("static/"):]
+    if rel in ("", "/"):
+        rel = "index.html"
+    target = (STATIC_DIR / rel).resolve()
+    if not str(target).startswith(str(STATIC_DIR.resolve())) or not target.is_file():
+        return None
+    return target
+
+
 def _make_handler(vault_root: Path):
     class Handler(BaseHTTPRequestHandler):
         server_version = "AIVault/0.4"
@@ -40,11 +58,9 @@ def _make_handler(vault_root: Path):
             self.end_headers()
             self.wfile.write(body)
 
-        def _send_static(self, rel: str):
-            if rel in ("", "/"):
-                rel = "index.html"
-            target = (STATIC_DIR / rel).resolve()
-            if not str(target).startswith(str(STATIC_DIR.resolve())) or not target.is_file():
+        def _send_static(self, url_path: str):
+            target = resolve_static(url_path)
+            if target is None:
                 self.send_error(404, "Not found")
                 return
             body = target.read_bytes()
@@ -61,7 +77,7 @@ def _make_handler(vault_root: Path):
             parsed = urlparse(self.path)
             path = parsed.path
             if not path.startswith("/api/"):
-                self._send_static(path.lstrip("/"))
+                self._send_static(path)
                 return
 
             qs = {k: v[0] for k, v in parse_qs(parsed.query).items()}
