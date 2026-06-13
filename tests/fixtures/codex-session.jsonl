@@ -1,0 +1,5 @@
+{"type":"session_meta","payload":{"id":"codex-sess-77","timestamp":"2026-06-11T14:00:00Z","cwd":"/home/dev/api-svc","instructions":null}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Refactor the database migration script to be idempotent"}]}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I'll guard each statement with IF NOT EXISTS and re-run ./migrate.sh."}]}}
+{"type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":\"./migrate.sh\"}"}}
+{"role":"user","content":[{"type":"input_text","text":"Looks good, also add a rollback step"}]}

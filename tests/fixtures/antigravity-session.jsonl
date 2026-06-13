@@ -1,0 +1,5 @@
+{"type":"session_meta","sessionId":"ag-001","cwd":"/home/dev/webapp","timestamp":"2026-06-12T10:00:00Z"}
+{"role":"user","content":"Build a REST endpoint for listing users","timestamp":"2026-06-12T10:00:01Z"}
+{"message":{"role":"assistant","content":[{"type":"text","text":"I'll add GET /users in app.py"},{"type":"tool_use","name":"Edit","input":{"file_path":"/home/dev/webapp/app.py"}}]},"timestamp":"2026-06-12T10:00:05Z"}
+not-json-skip-me
+{"payload":{"role":"user","content":[{"type":"input_text","text":"add pagination too"}]},"timestamp":"2026-06-12T10:00:20Z"}
