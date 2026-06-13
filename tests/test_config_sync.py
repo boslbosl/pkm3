@@ -32,6 +32,26 @@ def test_config_sync_sources_round_trip(tmp_path):
     assert reloaded.sync_os_scope == "all"
 
 
+def test_detect_cli_reports_missing_agents(tmp_path, monkeypatch):
+    import aivault.adapters.base as base
+    from typer.testing import CliRunner
+
+    from aivault.cli import app
+
+    # no homes -> nothing discoverable, so every agent should be "not found"
+    monkeypatch.setattr(base, "home_dirs", lambda scope: [])
+
+    root = tmp_path / "vault"
+    init_vault(root)
+
+    result = CliRunner().invoke(app, ["--vault", str(root), "detect"])
+    assert result.exit_code == 0
+    for tool in syncable_sources():
+        assert tool in result.stdout
+    assert "not found" in result.stdout
+    assert "0 found" in result.stdout
+
+
 def test_detect_groups_by_tool(tmp_path, monkeypatch):
     # Make discovery deterministic regardless of the test host: inject a fake home
     # tree containing a Claude Code session.
