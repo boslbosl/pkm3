@@ -21,6 +21,7 @@ DB_RELPATH = "db/aivault.sqlite"
 VAULT_DIRS = (
     "raw/artifacts/claude-code",
     "raw/artifacts/codex",
+    "raw/artifacts/antigravity",
     "raw/artifacts/chatgpt",
     "raw/artifacts/claude",
     "raw/artifacts/cursor",

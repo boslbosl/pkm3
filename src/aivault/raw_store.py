@@ -16,6 +16,7 @@ from .dedupe import artifact_hash
 _KNOWN_BUCKETS = {
     "claude-code",
     "codex",
+    "antigravity",
     "chatgpt",
     "claude",
     "cursor",

@@ -3,6 +3,7 @@ and never touch the database (ARCHITECTURE §6)."""
 
 from __future__ import annotations
 
+from .antigravity import AntigravityAdapter
 from .base import SourceAdapter, get_adapter, registry
 from .claude_code import ClaudeCodeAdapter
 from .codex import CodexAdapter
@@ -14,5 +15,6 @@ __all__ = [
     "registry",
     "ClaudeCodeAdapter",
     "CodexAdapter",
+    "AntigravityAdapter",
     "FolderImportAdapter",
 ]

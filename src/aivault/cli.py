@@ -81,15 +81,19 @@ def status():
 
 
 @app.command()
-def discover():
-    """List supported local sources found on this machine."""
+def discover(
+    os_scope: str = typer.Option(
+        "native", "--os-scope", help="Where to look: native | windows | wsl | all."
+    ),
+):
+    """List supported local sources found on this machine (optionally cross-OS)."""
     v = _open()
-    candidates = v.discover()
+    candidates = v.discover(os_scope)
     if not candidates:
-        typer.echo("No known local sources discovered.")
+        typer.echo(f"No known local sources discovered (scope: {os_scope}).")
     for c in candidates:
         typer.echo(
-            f"{c.source_tool:<12} {c.os_context:<6} ~{c.estimated_sessions} sessions  {c.path}"
+            f"{c.source_tool:<12} {c.os_context:<8} ~{c.estimated_sessions} sessions  {c.path}"
         )
     v.close()
 
@@ -141,27 +145,36 @@ def import_folder(
     v.close()
 
 
-def _sync(source_tool: str):
+def _sync(source_tool: str, os_scope: str):
     v = _open()
-    res = v.sync(source_tool)
+    res = v.sync(source_tool, os_scope)
     typer.secho(
-        f"{source_tool}: {len(res.imported)} imported, {res.skipped} skipped, "
-        f"{res.findings} findings.",
+        f"{source_tool} (scope: {os_scope}): {len(res.imported)} imported, "
+        f"{res.skipped} skipped, {res.findings} findings.",
         fg=typer.colors.GREEN,
     )
     v.close()
 
 
+_OS_SCOPE_OPT = typer.Option("native", "--os-scope", help="native | windows | wsl | all.")
+
+
 @sync_app.command("claude-code")
-def sync_claude_code():
+def sync_claude_code(os_scope: str = _OS_SCOPE_OPT):
     """Discover and import Claude Code JSONL logs."""
-    _sync("claude-code")
+    _sync("claude-code", os_scope)
 
 
 @sync_app.command("codex")
-def sync_codex():
+def sync_codex(os_scope: str = _OS_SCOPE_OPT):
     """Discover and import Codex JSONL logs."""
-    _sync("codex")
+    _sync("codex", os_scope)
+
+
+@sync_app.command("antigravity")
+def sync_antigravity(os_scope: str = _OS_SCOPE_OPT):
+    """Discover and import Antigravity (IDE + CLI) logs."""
+    _sync("antigravity", os_scope)
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +339,21 @@ def export_llmwiki_cmd(
         fg=typer.colors.GREEN,
     )
     v.close()
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address (local-only by default)."),
+    port: int = typer.Option(8765, "--port"),
+):
+    """Start the local web frontend to browse and search the vault."""
+    from .web import run as run_web
+
+    root = _vault_path()
+    if not (root / "config.yaml").exists():
+        typer.secho(f"No vault at {root}. Run `aivault init {root}`.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    run_web(root, host=host, port=port)
 
 
 def main() -> None:

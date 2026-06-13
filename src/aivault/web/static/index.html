@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIVault</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>AIVault</h1>
+    <input id="search" type="search" placeholder="Search sessions (FTS)…" autocomplete="off" />
+    <div class="views">
+      <button data-group="project" class="active">By project / repo</button>
+      <button data-group="source">By source</button>
+      <button data-group="time">Timeline</button>
+    </div>
+    <span id="stats" class="stats"></span>
+  </header>
+  <main>
+    <aside id="list" aria-label="Sessions"></aside>
+    <section id="detail"><p class="empty">Select a session to see all metadata.</p></section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

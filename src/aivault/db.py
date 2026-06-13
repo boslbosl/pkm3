@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS raw_artifacts (
     stored_path     TEXT NOT NULL,
     artifact_hash   TEXT NOT NULL UNIQUE,
     bytes           INTEGER,
+    os_context      TEXT DEFAULT 'native',
     imported_at     TEXT NOT NULL,
     import_batch_id INTEGER REFERENCES import_batches(id)
 );
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     ended_at           TEXT,
     imported_at        TEXT NOT NULL,
     status             TEXT NOT NULL DEFAULT 'new',
+    os_context         TEXT DEFAULT 'native',
     raw_artifact_id    TEXT REFERENCES raw_artifacts(id),
     source_fingerprint TEXT UNIQUE,
     content_hash       TEXT,

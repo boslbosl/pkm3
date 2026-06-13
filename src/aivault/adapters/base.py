@@ -6,6 +6,7 @@ import re
 from abc import ABC, abstractmethod
 
 from ..models import CanonicalSession, SourceCandidate
+from ..platform_paths import home_dirs
 
 # crude path-ish token used as a fallback to surface files mentioned in prose
 _PATH_RE = re.compile(r"(?:[~./]|[A-Za-z]:\\)[\w./\\-]*\w\.\w{1,8}\b")
@@ -21,9 +22,20 @@ class SourceAdapter(ABC):
     source_type: str
     source_kind: str = "local-log"
 
-    @abstractmethod
-    def discover(self) -> list[SourceCandidate]:
-        """Locate candidate source files/dirs on this machine. May return []."""
+    # Home-relative sub-paths to probe, e.g. (".claude/projects",). Adapters that
+    # use the default home-based discovery just set this; others override discover.
+    home_subpaths: tuple[str, ...] = ()
+    file_glob: str = "**/*.jsonl"
+
+    def discover(self, os_scope: str = "native") -> list[SourceCandidate]:
+        """Locate candidate source dirs across OS contexts (ARCHITECTURE §8a).
+
+        Default implementation composes ``home_subpaths`` onto each home dir
+        returned for ``os_scope``. Adapters with no fixed location override this.
+        """
+        return candidates_from_homes(
+            self.source_type, self.source_kind, self.home_subpaths, self.file_glob, os_scope
+        )
 
     @abstractmethod
     def normalize(self, raw_bytes: bytes, original_path: str | None) -> list[CanonicalSession]:
@@ -84,6 +96,39 @@ def extract_commands_and_paths(content) -> tuple[list[str], list[str]]:
     return commands, paths
 
 
+def candidates_from_homes(
+    source_tool: str,
+    source_kind: str,
+    home_subpaths: tuple[str, ...],
+    file_glob: str,
+    os_scope: str,
+) -> list[SourceCandidate]:
+    """Build SourceCandidates by composing tool sub-paths onto each home dir."""
+    out: list[SourceCandidate] = []
+    if not home_subpaths:
+        return out
+    for home in home_dirs(os_scope):
+        for sub in home_subpaths:
+            root = home.path / sub
+            try:
+                if not root.exists():
+                    continue
+                count = sum(1 for _ in root.glob(file_glob))
+            except (PermissionError, OSError):
+                continue
+            if count:
+                out.append(
+                    SourceCandidate(
+                        source_tool=source_tool,
+                        source_kind=source_kind,
+                        path=root,
+                        os_context=home.os_context,
+                        estimated_sessions=count,
+                    )
+                )
+    return out
+
+
 def dedupe_keep_order(items: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -100,6 +145,7 @@ def dedupe_keep_order(items: list[str]) -> list[str]:
 
 def _build_registry() -> dict[str, SourceAdapter]:
     # imported here to avoid circular imports at module load
+    from .antigravity import AntigravityAdapter
     from .claude_code import ClaudeCodeAdapter
     from .codex import CodexAdapter
     from .folder_import import FolderImportAdapter
@@ -107,6 +153,7 @@ def _build_registry() -> dict[str, SourceAdapter]:
     adapters: list[SourceAdapter] = [
         ClaudeCodeAdapter(),
         CodexAdapter(),
+        AntigravityAdapter(),
         FolderImportAdapter(),
     ]
     return {a.source_type: a for a in adapters}
@@ -135,7 +182,7 @@ class _LabeledFolderAdapter(SourceAdapter):
         self.source_kind = "manual"
         self._base = base
 
-    def discover(self) -> list[SourceCandidate]:
+    def discover(self, os_scope: str = "native") -> list[SourceCandidate]:
         return []
 
     def normalize(self, raw_bytes: bytes, original_path: str | None) -> list[CanonicalSession]:

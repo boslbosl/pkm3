@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ..models import CanonicalMessage, CanonicalSession, SourceCandidate
+from ..models import CanonicalMessage, CanonicalSession
 from .base import (
     SourceAdapter,
     dedupe_keep_order,
@@ -24,33 +24,12 @@ from .base import (
     extract_text,
 )
 
-_DISCOVER_GLOBS = [
-    (Path.home() / ".codex" / "sessions", "**/*.jsonl", "native"),
-    (Path("/mnt/c/Users"), "*/.codex/sessions/**/*.jsonl", "wsl"),
-]
-
 
 class CodexAdapter(SourceAdapter):
     source_type = "codex"
     source_kind = "local-log"
-
-    def discover(self) -> list[SourceCandidate]:
-        out: list[SourceCandidate] = []
-        for root, pattern, os_ctx in _DISCOVER_GLOBS:
-            if not root.exists():
-                continue
-            files = list(root.glob(pattern))
-            if files:
-                out.append(
-                    SourceCandidate(
-                        source_tool=self.source_type,
-                        source_kind=self.source_kind,
-                        path=root,
-                        os_context=os_ctx,
-                        estimated_sessions=len(files),
-                    )
-                )
-        return out
+    home_subpaths = (".codex/sessions",)
+    file_glob = "**/*.jsonl"
 
     def normalize(self, raw_bytes: bytes, original_path: str | None) -> list[CanonicalSession]:
         text = raw_bytes.decode("utf-8", errors="replace")
@@ -121,6 +100,7 @@ class CodexAdapter(SourceAdapter):
                 started_at=started,
                 ended_at=ended,
                 project_name=project,
+                project_root=cwd,
                 messages=messages,
                 commands=dedupe_keep_order(commands),
                 file_paths=dedupe_keep_order(paths),

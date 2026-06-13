@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ..models import CanonicalMessage, CanonicalSession, SourceCandidate
+from ..models import CanonicalMessage, CanonicalSession
 from .base import (
     SourceAdapter,
     dedupe_keep_order,
@@ -24,35 +24,13 @@ from .base import (
     extract_text,
 )
 
-# Default discovery locations (native + common WSL mounts).
-_DISCOVER_GLOBS = [
-    (Path.home() / ".claude" / "projects", "**/*.jsonl", "native"),
-    (Path.home() / ".config" / "claude" / "projects", "**/*.jsonl", "native"),
-    (Path("/mnt/c/Users"), "*/.claude/projects/**/*.jsonl", "wsl"),
-]
-
 
 class ClaudeCodeAdapter(SourceAdapter):
     source_type = "claude-code"
     source_kind = "local-log"
-
-    def discover(self) -> list[SourceCandidate]:
-        out: list[SourceCandidate] = []
-        for root, pattern, os_ctx in _DISCOVER_GLOBS:
-            if not root.exists():
-                continue
-            files = list(root.glob(pattern))
-            if files:
-                out.append(
-                    SourceCandidate(
-                        source_tool=self.source_type,
-                        source_kind=self.source_kind,
-                        path=root,
-                        os_context=os_ctx,
-                        estimated_sessions=len(files),
-                    )
-                )
-        return out
+    # discovered across OS contexts via the home-based default discover()
+    home_subpaths = (".claude/projects", ".config/claude/projects")
+    file_glob = "**/*.jsonl"
 
     def normalize(self, raw_bytes: bytes, original_path: str | None) -> list[CanonicalSession]:
         text = raw_bytes.decode("utf-8", errors="replace")
@@ -122,6 +100,7 @@ class ClaudeCodeAdapter(SourceAdapter):
                 (summaries[u] for u in g["uuids"] if u in summaries),
                 _title_from_first(msgs),
             )
+            sessions_project_root = g["cwd"]
             sessions.append(
                 CanonicalSession(
                     source_tool=self.source_type,
@@ -131,6 +110,7 @@ class ClaudeCodeAdapter(SourceAdapter):
                     started_at=times[0] if times else None,
                     ended_at=times[-1] if times else None,
                     project_name=project,
+                    project_root=sessions_project_root,
                     messages=msgs,
                     commands=dedupe_keep_order(g["commands"]),
                     file_paths=dedupe_keep_order(g["paths"]),

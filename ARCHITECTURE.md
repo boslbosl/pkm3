@@ -1,8 +1,13 @@
 # ARCHITECTURE — AIVault
 
-**Version:** Canonical v0.3  
-**Date:** 2026-06-12  
-**Scope:** Local-first AI session collection, normalization, search, triage, and export.
+**Version:** Canonical v0.4
+**Date:** 2026-06-13
+**Scope:** Local-first AI session collection, normalization, search, triage, browse, and export.
+
+> **v0.4 additions over v0.3:** Antigravity (IDE + CLI) adapter (§7.4); cross-OS
+> discovery between WSL and Windows (§8a); a dependency-free local web frontend
+> for navigation/search/grouping with full metadata (§12a). See §19 for the
+> review-driven refinements.
 
 ---
 
@@ -18,15 +23,18 @@ AIVault sits between AI tools and downstream knowledge systems.
         │
         ▼
 [AIVault]
-  discover -> import -> raw store -> normalize -> index -> triage -> export
+  discover -> import -> raw store -> normalize -> index -> triage -> browse -> export
         │
         ├── CLI
-        ├── local web UI, later
+        ├── local web UI (read-only browse/search, v0.4)
         ├── MCP/API, later
         ├── LLM Wiki export
         ├── Obsidian export
         └── JSONL/Notion-ready export
 ```
+
+Discovery spans operating systems: from WSL it can reach Windows user profiles,
+and from Windows it can reach WSL distros (§8a).
 
 AIVault is the collection and curation layer, not the final wiki compiler.
 
@@ -211,6 +219,28 @@ Output:
 
 ---
 
+### 7.4 Antigravity adapter
+
+Antigravity (Google's agentic IDE, with a CLI) stores local session/agent
+history. The exact on-disk format is not contractually stable, so this adapter
+is **best-effort and version-tolerant** (§18.1) with the generic folder importer
+as fallback.
+
+Input:
+
+- local JSONL/JSON agent logs from the IDE and the CLI
+- candidate locations (probed, may evolve):
+  - `~/.antigravity/**`, `~/.config/Antigravity/**` (Linux/WSL/macOS)
+  - `%APPDATA%/Antigravity/**`, `%LOCALAPPDATA%/Antigravity/**` (Windows)
+
+Output:
+
+- same canonical model as the other coding-agent adapters
+- one session per logical conversation where a session id is discoverable,
+  otherwise one session per file
+
+---
+
 ## 8. CASS bridge
 
 CASS is optional.
@@ -230,6 +260,40 @@ Bridge rules:
 2. AIVault does not use the CASS DB as its internal source of truth.
 3. AIVault does not copy CASS source code into MVP.
 4. If CASS is unavailable, native adapters continue to work.
+
+---
+
+## 8a. Cross-OS discovery (WSL ↔ Windows)
+
+Native adapters do not hard-code `$HOME`. A `platform_paths` layer enumerates
+candidate **home directories** per OS context, and adapters compose their
+tool-specific sub-path (e.g. `.claude/projects`, `.codex/sessions`,
+`.antigravity`) on top.
+
+```text
+platform_paths.home_dirs(os_scope) -> list[(home_path, os_context)]
+adapter.discover(os_scope):
+    for (home, ctx) in home_dirs(os_scope):
+        scan home / <tool subpath> for session files  ->  SourceCandidate(os_context=ctx)
+```
+
+`os_scope` selects direction:
+
+| scope | from WSL/Linux | from Windows |
+|---|---|---|
+| `native` | `~` (current user) | `C:\Users\<me>` |
+| `windows` | `/mnt/<drive>/Users/*` | `C:\Users\*` |
+| `wsl` | `/home/*` (local distro) | `\\wsl.localhost\<distro>\home\*`, legacy `\\wsl$\...` |
+| `all` | union of the above | union of the above |
+
+Rules:
+
+1. Every discovered candidate carries its `os_context`; sessions and raw
+   artifacts persist it. The two sides are never silently merged.
+2. The original (cross-mount) path is preserved verbatim and feeds the
+   `source_fingerprint`, so the same file seen via two mounts dedupes.
+3. Discovery and import tolerate unreadable / permission-denied / oddly-encoded
+   files: skip and continue, never abort a whole sync.
 
 ---
 
@@ -346,6 +410,44 @@ MVP can export raw excerpts without LLM-generated summaries. Capsule generation 
 
 ---
 
+## 12a. Web frontend (local browse/search)
+
+The web UI is a **dependency-free local server** (Python stdlib `http.server`)
+plus a small static single-page app. No node build step, no extra runtime
+dependencies, no daemon — it starts with `aivault serve` and stops on Ctrl-C.
+Bound to `127.0.0.1` by default (local-first; §2 principle 1). Read-only in v0.4.
+
+### Layers
+
+```text
+web/api.py     pure functions: Vault -> plain dict payloads (unit-testable, no sockets)
+web/server.py  thin HTTP transport: routes /api/* to api.py, serves static files
+web/static/    index.html + app.js + style.css (vanilla, no framework)
+```
+
+### JSON API
+
+```text
+GET /api/stats                          counts + per-source / per-status breakdown
+GET /api/projects                       projects with repo root path + session counts
+GET /api/sessions?group=&q=&source=&project=&status=&os=&limit=
+        group = project | source | time   (time = flat chronological)
+        q     = FTS query (same engine as the CLI)
+GET /api/session/{id}                   full metadata + messages + snippets
+                                        + tags + redaction findings + raw artifact path
+```
+
+### Views (same data, three lenses)
+
+1. **By project/repo** — grouped by project root path (repo), sessions sorted by time within each.
+2. **By source tool** — grouped by `source_tool` (and `os_context`).
+3. **Chronological** — one flat timeline of everything, newest first.
+
+The search box filters whichever view is active using the shared FTS index.
+Selecting a session opens a detail panel exposing **all** stored metadata.
+
+---
+
 ## 13. CLI commands
 
 MVP CLI:
@@ -353,9 +455,10 @@ MVP CLI:
 ```bash
 aivault init [path]
 aivault status
-aivault discover
-aivault sync claude-code
-aivault sync codex
+aivault discover [--os-scope native|windows|wsl|all]
+aivault sync claude-code [--os-scope ...]
+aivault sync codex [--os-scope ...]
+aivault sync antigravity [--os-scope ...]
 aivault import-file <path> --source <source>
 aivault import-folder <path> --source <source>
 aivault list [--source] [--project] [--status]
@@ -364,6 +467,7 @@ aivault show <session-id>
 aivault mark <session-id> <status>
 aivault tag <session-id> <tag...>
 aivault export llmwiki --status wiki-ready --out <path>
+aivault serve [--host 127.0.0.1] [--port 8765]
 ```
 
 Later CLI:
@@ -373,7 +477,6 @@ aivault cass discover
 aivault cass import
 aivault redact preview
 aivault capsule generate
-aivault serve
 aivault mcp serve
 ```
 
@@ -386,9 +489,10 @@ Python 3.11+
 Typer for CLI
 Pydantic for canonical models
 SQLite + FTS5 for storage/search
+Python stdlib http.server + vanilla JS for the local web UI (no build, no deps)
 pytest for test fixtures
 watchdog later for file watching
-FastAPI + React/Tauri later for local UI
+FastAPI + React/Tauri later if the UI outgrows the stdlib server
 ```
 
 ---
@@ -473,3 +577,27 @@ adapters MUST:
   (`text`, `input_text`, `output_text`, `tool_use`, `tool_result`);
 - treat session id / cwd / timestamps as **optional** and fall back gracefully;
 - be covered by a fixture in `tests/fixtures/` representing the expected shape.
+
+---
+
+## 19. Review-driven refinements (v0.4)
+
+Architectural decisions resulting from the PM/Developer/User review (PRD §14):
+
+1. **`platform_paths` indirection** — adapters never hard-code `$HOME`. A single
+   module resolves OS-context home directories and powers `--os-scope`, keeping
+   cross-OS logic out of every adapter and testable via injected fake roots.
+2. **`os_context` is a first-class field** on candidates, sessions, and raw
+   artifacts. WSL and Windows views are kept distinct; dedupe still collapses the
+   same file seen through two mounts because the original path feeds the
+   fingerprint.
+3. **Web UI = stdlib server + static SPA.** Chosen over FastAPI/React to honor
+   "no daemon, easy install, dependency-free." API logic lives in pure functions
+   (`web/api.py`) so it is unit-tested without a socket; the HTTP layer is thin.
+4. **Read-only web v0.4.** The UI is a browse/search lens over the DB, not a
+   second write path. Triage/write endpoints are a deliberate fast follow once the
+   read path is stable, protecting the CLI as the single source of mutations.
+5. **Project root (repo path) persisted** so the UI can group by repo, not just by
+   the (possibly colliding) folder basename.
+6. **Fault-tolerant discovery/import.** Cross-OS scanning must survive permission
+   and encoding errors on individual files without aborting a sync.

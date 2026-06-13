@@ -22,7 +22,7 @@ class FolderImportAdapter(SourceAdapter):
     source_type = "folder"
     source_kind = "manual"
 
-    def discover(self) -> list[SourceCandidate]:
+    def discover(self, os_scope: str = "native") -> list[SourceCandidate]:
         # Generic importer has no fixed discovery location.
         return []
 

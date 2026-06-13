@@ -17,6 +17,7 @@ from .adapters.base import get_adapter
 from .config import VaultConfig, create_vault_dirs
 from .dedupe import content_hash, source_fingerprint
 from .models import STATUSES, CanonicalSession
+from .platform_paths import infer_os_context
 from .raw_store import store_artifact
 from .redaction import scan_session
 
@@ -72,9 +73,14 @@ class Vault:
         if not name:
             return None
         row = self.conn.execute(
-            "SELECT id FROM projects WHERE name = ?", (name,)
+            "SELECT id, root_path FROM projects WHERE name = ?", (name,)
         ).fetchone()
         if row:
+            # backfill repo root path the first time we learn it
+            if root_path and not row["root_path"]:
+                self.conn.execute(
+                    "UPDATE projects SET root_path = ? WHERE id = ?", (root_path, row["id"])
+                )
             return row["id"]
         cur = self.conn.execute(
             "INSERT INTO projects(name, root_path, created_at) VALUES(?, ?, ?)",
@@ -83,11 +89,20 @@ class Vault:
         return cur.lastrowid
 
     # --- import engine ---------------------------------------------------
-    def import_file(self, path: Path, source_tool: str) -> ImportResult:
-        raw_bytes = path.read_bytes()
-        return self._import_bytes(raw_bytes, str(path), source_tool)
+    def import_file(
+        self, path: Path, source_tool: str, os_context: str | None = None
+    ) -> ImportResult:
+        try:
+            raw_bytes = path.read_bytes()
+        except (PermissionError, OSError):
+            # tolerate unreadable files during cross-OS scans (ARCHITECTURE §8a)
+            return ImportResult(skipped=1)
+        ctx = os_context or infer_os_context(str(path))
+        return self._import_bytes(raw_bytes, str(path), source_tool, ctx)
 
-    def _import_bytes(self, raw_bytes: bytes, original_path: str, source_tool: str) -> ImportResult:
+    def _import_bytes(
+        self, raw_bytes: bytes, original_path: str, source_tool: str, os_context: str = "native"
+    ) -> ImportResult:
         result = ImportResult()
         adapter = get_adapter(source_tool)
 
@@ -105,8 +120,8 @@ class Vault:
         artifact_id = str(uuid.uuid4())
         self.conn.execute(
             "INSERT INTO raw_artifacts"
-            "(id, source_tool, source_kind, original_path, stored_path, artifact_hash, bytes, imported_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, source_tool, source_kind, original_path, stored_path, artifact_hash, bytes, os_context, imported_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 artifact_id,
                 source_tool,
@@ -115,13 +130,14 @@ class Vault:
                 stored.stored_rel_path,
                 stored.artifact_hash,
                 stored.bytes,
+                os_context,
                 _now(),
             ),
         )
 
         sessions = adapter.normalize(raw_bytes, original_path)
         for cs in sessions:
-            sid = self._persist_session(cs, artifact_id, original_path)
+            sid = self._persist_session(cs, artifact_id, original_path, os_context)
             if sid is None:
                 result.skipped += 1
             else:
@@ -132,7 +148,7 @@ class Vault:
         return result
 
     def _persist_session(
-        self, cs: CanonicalSession, artifact_id: str, original_path: str
+        self, cs: CanonicalSession, artifact_id: str, original_path: str, os_context: str = "native"
     ) -> str | None:
         fp = source_fingerprint(cs.source_tool, original_path, cs.source_session_id)
         ch = content_hash(cs)
@@ -149,15 +165,13 @@ class Vault:
             return None  # not a new import
 
         session_id = str(uuid.uuid4())
-        project_id = self._get_or_create_project(
-            cs.project_name, None
-        )
+        project_id = self._get_or_create_project(cs.project_name, cs.project_root)
         self.conn.execute(
             "INSERT INTO sessions"
             "(id, source_tool, source_kind, source_session_id, project_id, title,"
-            " started_at, ended_at, imported_at, status, raw_artifact_id,"
+            " started_at, ended_at, imported_at, status, os_context, raw_artifact_id,"
             " source_fingerprint, content_hash, dedupe_key, sensitivity, summary, message_count)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 session_id,
                 cs.source_tool,
@@ -169,6 +183,7 @@ class Vault:
                 cs.ended_at,
                 _now(),
                 "new",
+                os_context,
                 artifact_id,
                 fp,
                 ch,
@@ -208,20 +223,24 @@ class Vault:
         return len(findings)
 
     # --- discovery / sync ------------------------------------------------
-    def discover(self) -> list:
+    def discover(self, os_scope: str = "native") -> list:
         from .adapters.base import _build_registry
 
         candidates = []
         for adapter in _build_registry().values():
-            candidates.extend(adapter.discover())
+            candidates.extend(adapter.discover(os_scope))
         return candidates
 
-    def sync(self, source_tool: str) -> ImportResult:
+    def sync(self, source_tool: str, os_scope: str = "native") -> ImportResult:
         adapter = get_adapter(source_tool)
         total = ImportResult()
-        for candidate in adapter.discover():
-            for jsonl in sorted(candidate.path.glob("**/*.jsonl")):
-                res = self.import_file(jsonl, source_tool)
+        for candidate in adapter.discover(os_scope):
+            try:
+                files = sorted(candidate.path.glob(adapter.file_glob))
+            except (PermissionError, OSError):
+                continue
+            for jsonl in files:
+                res = self.import_file(jsonl, source_tool, os_context=candidate.os_context)
                 total.imported.extend(res.imported)
                 total.skipped += res.skipped
                 total.findings += res.findings
@@ -275,11 +294,12 @@ class Vault:
         source: str | None = None,
         project: str | None = None,
         status: str | None = None,
+        os_context: str | None = None,
         limit: int = 100,
     ) -> list:
         sql = (
-            "SELECT s.*, p.name AS project_name FROM sessions s "
-            "LEFT JOIN projects p ON p.id = s.project_id WHERE 1=1"
+            "SELECT s.*, p.name AS project_name, p.root_path AS project_root "
+            "FROM sessions s LEFT JOIN projects p ON p.id = s.project_id WHERE 1=1"
         )
         params: list = []
         if source:
@@ -291,6 +311,9 @@ class Vault:
         if status:
             sql += " AND s.status = ?"
             params.append(normalize_status(status))
+        if os_context:
+            sql += " AND s.os_context = ?"
+            params.append(os_context)
         sql += " ORDER BY COALESCE(s.started_at, s.imported_at) DESC LIMIT ?"
         params.append(limit)
         return self.conn.execute(sql, params).fetchall()
@@ -302,8 +325,8 @@ class Vault:
         rows = []
         for sid in ids:  # preserve rank order
             r = self.conn.execute(
-                "SELECT s.*, p.name AS project_name FROM sessions s "
-                "LEFT JOIN projects p ON p.id = s.project_id WHERE s.id = ?",
+                "SELECT s.*, p.name AS project_name, p.root_path AS project_root "
+                "FROM sessions s LEFT JOIN projects p ON p.id = s.project_id WHERE s.id = ?",
                 (sid,),
             ).fetchone()
             if r:
@@ -313,8 +336,8 @@ class Vault:
     def get_session(self, session_id: str):
         # allow short-id prefix match for convenience
         row = self.conn.execute(
-            "SELECT s.*, p.name AS project_name FROM sessions s "
-            "LEFT JOIN projects p ON p.id = s.project_id "
+            "SELECT s.*, p.name AS project_name, p.root_path AS project_root "
+            "FROM sessions s LEFT JOIN projects p ON p.id = s.project_id "
             "WHERE s.id = ? OR s.id LIKE ?",
             (session_id, session_id + "%"),
         ).fetchone()

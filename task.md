@@ -73,6 +73,19 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` todo
 - [x] `test_llmwiki_export.py` (incl. idempotency)
 - [x] `conftest.py` — temp vault fixture
 
+## Phase 8 — v0.4 additions (Antigravity, cross-OS, web UI)
+- [x] PRD §6.6/§6.7/§14 + ARCHITECTURE §7.4/§8a/§12a/§19 updated (PM/Dev/User review)
+- [x] `platform_paths.py` — WSL↔Windows home enumeration + `os_context` inference
+- [x] `adapters/base.py` — `discover(os_scope)` + `candidates_from_homes` helper
+- [x] `adapters/antigravity.py` — shape-agnostic IDE/CLI adapter (+ raw bucket, registry)
+- [x] Refactor Claude Code / Codex adapters onto home-based discovery; persist `project_root`
+- [x] Schema v2: `os_context` on sessions + raw_artifacts; thread through import engine
+- [x] `--os-scope` on `discover` / `sync`; `sync antigravity`; fault-tolerant scans
+- [x] `web/api.py` (pure functions) + `web/server.py` (stdlib http) + static SPA
+- [x] `aivault serve`; views by project/repo, source, timeline; full metadata; FTS search
+- [x] Tests: antigravity adapter, platform_paths, cross-OS, web API (29 passing total)
+- [ ] Web write/triage endpoints (deliberate fast follow; read-only in v0.4)
+
 ## MVP acceptance (START_HERE §8)
 - [x] `aivault init` creates a local vault
 - [x] Claude Code + Codex sessions discoverable/importable

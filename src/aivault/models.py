@@ -31,6 +31,7 @@ class CanonicalSession(BaseModel):
     started_at: str | None = None
     ended_at: str | None = None
     project_name: str | None = None
+    project_root: str | None = None
     summary: str | None = None
     sensitivity: str = "unknown"
     messages: list[CanonicalMessage] = Field(default_factory=list)
